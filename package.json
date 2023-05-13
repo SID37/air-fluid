@@ -1,0 +1,21 @@
+{
+    "name": "ru.sid37.airfluid",
+    "displayName": "Air Fluid",
+    "version": "0.0.1",
+    "description": "Interactive fluid simulation for VFX Graph",
+    "unity": "2021.3",
+    "license": "MIT",
+    "dependencies": {
+        "com.unity.visualeffectgraph": "12.1.0"
+    },
+    "keywords": [
+        "Fluids",
+        "VFX",
+        "FluidSimulation"
+    ],
+    "author": {
+        "name": "SID37",
+        "email": "SID-137@yandex.ru",
+        "url": "https://github.com/SID37"
+    }
+}

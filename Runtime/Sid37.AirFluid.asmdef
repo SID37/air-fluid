@@ -1,0 +1,21 @@
+{
+    "name": "Sid37.AirFluid",
+    "references": [
+        "Unity.Visualeffectgraph"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.visualeffectgraph",
+            "expression": "12.1.0",
+            "define": "UNITY_VISUAL_EFFECT_GRAPH"
+        }
+    ],
+    "noEngineReferences": false
+}
