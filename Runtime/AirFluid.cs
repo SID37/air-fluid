@@ -18,7 +18,20 @@ namespace AirFluid
         [SerializeField, HideInInspector]
         ComputeShader m_Compute = null;
 
-        float Scale => Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
+        internal AirComputer computer;
+
+        public float Scale => Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
+
+        private void Start()
+        {
+            computer = new AirComputer(m_Compute, blocks, idleVelocity);
+        }
+
+        private void FixedUpdate()
+        {
+            var value = new Vector3(1, 0, 0);
+            computer.Fill(new Vector3(value.x / blocks.x, value.y / blocks.y, value.z / blocks.z));
+        }
 
         private void OnValidate()
         {

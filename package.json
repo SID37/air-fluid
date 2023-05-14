@@ -6,7 +6,7 @@
     "unity": "2021.3",
     "license": "MIT",
     "dependencies": {
-        "com.unity.visualeffectgraph": "12.1.0"
+        "com.unity.visualeffectgraph": "11.0.0"
     },
     "keywords": [
         "Fluids",

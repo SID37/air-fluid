@@ -1,8 +1,8 @@
 {
-    "name": "Sid37.AirFluid",
+    "name": "Sid37.AirFluid.Editor",
     "rootNamespace": "",
     "references": [
-        "Unity.VisualEffectGraph.Runtime"
+        "Sid37.AirFluid"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -11,12 +11,6 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [
-        {
-            "name": "com.unity.visualeffectgraph",
-            "expression": "11.0.0",
-            "define": "UNITY_VISUAL_EFFECT_GRAPH"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }

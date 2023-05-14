@@ -1,12 +1,12 @@
 #pragma kernel Fill
 
 
-RWTexture3D<float4> Result;
+RWTexture3D<float4> FillResult;
 float4 FillValue;
 
-[numthreads(8,8,8)]
+[numthreads(16, 16, 2)]
 void Fill(uint3 id : SV_DispatchThreadID)
 {
-    Result[id] = FillValue;
+    FillResult[id] = FillValue;
 }
 
