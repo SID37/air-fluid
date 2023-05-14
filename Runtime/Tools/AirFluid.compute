@@ -1,12 +1,52 @@
 #pragma kernel Fill
+#pragma kernel SphereForce
 
 
-RWTexture3D<float4> FillResult;
+// ##########################
+// #         Common         #
+// ##########################
+
+RWTexture3D<float4> MainTexture;
+RWTexture3D<float4> TempTexture;
+uint3 GridSize;    // blocks * blockSize
+
+bool inStimulationArea(uint3 id) {
+    return
+        id.x > 0 && id.y > 0 && id.z > 0
+        && id.x < GridSize.x - 1
+        && id.y < GridSize.y - 1
+        && id.z < GridSize.z - 1;
+}
+
+// ##########################
+// #          Fill          #
+// ##########################
+
 float4 FillValue;
 
 [numthreads(16, 16, 2)]
 void Fill(uint3 id : SV_DispatchThreadID)
 {
-    FillResult[id] = FillValue;
+    MainTexture[id] = FillValue;
 }
 
+// ##########################
+// #       SphereForce      #
+// ##########################
+
+float3 SphereForceCenter;
+float3 SphereForceValue;
+float SphereForceRadius;
+
+[numthreads(16, 16, 2)]
+void SphereForce(uint3 id : SV_DispatchThreadID)
+{
+    if (!inStimulationArea(id))
+        return;
+    float3 d = SphereForceCenter - id;
+    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
+    if (r2 <= SphereForceRadius * SphereForceRadius) {
+        float4 cell = MainTexture[id];
+        MainTexture[id] = float4(cell.xyz + SphereForceValue, cell.w);
+    }
+}

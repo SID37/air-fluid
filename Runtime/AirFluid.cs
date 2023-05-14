@@ -18,20 +18,37 @@ namespace AirFluid
         [SerializeField, HideInInspector]
         ComputeShader m_Compute = null;
 
+        class Collisions
+        {
+            public struct Wind<T> where T : AirCollider
+            {
+                public T collider;
+                public Vector3 force;
+            }
+
+            public struct Obstacle<T> where T : AirCollider
+            {
+                public T collider;
+                public Vector3 velocity;
+                public Vector3 angularVelocity;
+            }
+
+            public List<Wind<AirSphereCollider>> SphereWinds = new();
+
+            public List<Obstacle<AirSphereCollider>> SphereObstacles = new();
+
+            public void Clear()
+            {
+                SphereWinds.Clear();
+                SphereObstacles.Clear();
+            }
+        }
+
         internal AirComputer computer;
+        private Collider[] colliders = new Collider[8];
+        private Collisions collisions = new Collisions();
 
         public float Scale => Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
-
-        private void Start()
-        {
-            computer = new AirComputer(m_Compute, blocks, idleVelocity);
-        }
-
-        private void FixedUpdate()
-        {
-            var value = new Vector3(1, 0, 0);
-            computer.Fill(new Vector3(value.x / blocks.x, value.y / blocks.y, value.z / blocks.z));
-        }
 
         private void OnValidate()
         {
@@ -40,9 +57,102 @@ namespace AirFluid
             if (blocks.z <= 0) blocks.z = 1;
         }
 
-        Vector3 LocalToWorld(Vector3 point)
+        private void Start()
+        {
+            computer = new AirComputer(m_Compute, blocks);
+            computer.Fill(idleVelocity / Scale);
+        }
+
+        private void FixedUpdate()
+        {
+            var dt = Time.deltaTime;
+            UpdateCollisions();
+            ApplyWind(dt);
+        }
+
+        private void UpdateCollisions()
+        {
+            LayerMask layerMask = new LayerMask();
+            for (int i = 0; i < 32; i++)
+            {
+                if (!Physics.GetIgnoreLayerCollision(i, gameObject.layer))
+                    layerMask |= 1 << i;
+            }
+
+            int count;
+            var halfExtensions = new Vector3(Scale * blocks.x, Scale * blocks.y, Scale * blocks.z) / 2;
+            while (true)
+            {
+                count = Physics.OverlapBoxNonAlloc(
+                    transform.position + transform.rotation * halfExtensions,
+                    halfExtensions,
+                    colliders,
+                    transform.rotation,
+                    layerMask
+                );
+                if (count < colliders.Length)
+                    break;
+                colliders = new Collider[colliders.Length * 2];
+            }
+
+            collisions.Clear();
+            for (int i = 0; i < count; ++i)
+            {
+                var collider = colliders[i];
+                AirWindSource windSource = null;
+                Rigidbody rigidbody = null;
+                if (collider.isTrigger)
+                {
+                    windSource = collider.GetComponent<AirWindSource>();
+                    if (windSource == null) continue;
+                }
+                else
+                    rigidbody = collider.GetComponent<Rigidbody>();
+
+                switch (collider)
+                {
+                    case SphereCollider sCollider: StoreCollision(new AirSphereCollider(sCollider, this), windSource, rigidbody, collisions.SphereWinds, collisions.SphereObstacles); break;
+                    case BoxCollider bCollider: Debug.Log($"BoxCollider {bCollider.size}"); break;
+                    case CapsuleCollider cCollider: Debug.Log($"CapsuleCollider {cCollider.radius}, {cCollider.height}, {cCollider.direction}"); break;
+                    case MeshCollider mCollider: Debug.Log($"MeshCollider {mCollider.sharedMesh}"); break;
+                    case TerrainCollider tCollider: Debug.Log($"TerrainCollider {tCollider.terrainData}"); break;
+                    case WheelCollider wCollider: Debug.Log($"WheelCollider {wCollider.center}"); break;
+                    default: Debug.LogWarning($"Unsupported collider: {collider.GetType()}"); break;
+                }
+            }
+        }
+
+        private void StoreCollision<T>(T collider, AirWindSource windSource, Rigidbody body,
+            List<Collisions.Wind<T>> windList, List<Collisions.Obstacle<T>> obstacleList) where T : AirCollider
+        {
+            if (windSource != null)
+            {
+                windList.Add(new Collisions.Wind<T>()
+                {
+                    collider = collider,
+                    force = windSource.WorldForce / Scale
+                });
+            }
+            else
+            {
+                // TODO: store obstacle
+            }
+        }
+
+        private void ApplyWind(float dt)
+        {
+            foreach (var sphere in collisions.SphereWinds)
+                computer.SphereForce(sphere.collider.Center, sphere.collider.Radius, sphere.force * dt);
+        }
+
+        internal Vector3 LocalToWorld(Vector3 point)
         {
             return transform.position + transform.rotation * (point * Scale);
+        }
+
+        internal Vector3 WorldToLocal(Vector3 point)
+        {
+            return Quaternion.Inverse(transform.rotation) * (point - transform.position) / Scale;
         }
 
         void GizmoDrawContour(params Vector3[] p)
