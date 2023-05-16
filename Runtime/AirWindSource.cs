@@ -19,5 +19,10 @@ namespace AirFluid
             Gizmos.DrawLine(transform.position, transform.position + WorldForce);
             Gizmos.DrawSphere(transform.position + WorldForce, force.magnitude / 10);
         }
+
+        void OnDrawGizmos()
+        {
+            Gizmos.DrawIcon(transform.position, "Light Gizmo.tiff", true);
+        }
     }
 }

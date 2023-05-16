@@ -34,13 +34,17 @@ namespace AirFluid
             }
 
             public List<Wind<AirSphereCollider>> SphereWinds = new();
+            public List<Wind<AirCapsuleCollider>> CapsuleWinds = new();
 
             public List<Obstacle<AirSphereCollider>> SphereObstacles = new();
+            public List<Obstacle<AirCapsuleCollider>> CapsuleObstacles = new();
 
             public void Clear()
             {
                 SphereWinds.Clear();
+                CapsuleWinds.Clear();
                 SphereObstacles.Clear();
+                CapsuleObstacles.Clear();
             }
         }
 
@@ -107,13 +111,13 @@ namespace AirFluid
                     if (windSource == null) continue;
                 }
                 else
-                    rigidbody = collider.GetComponent<Rigidbody>();
+                    rigidbody = collider.GetComponentInParent<Rigidbody>(true);
 
                 switch (collider)
                 {
                     case SphereCollider sCollider: StoreCollision(new AirSphereCollider(sCollider, this), windSource, rigidbody, collisions.SphereWinds, collisions.SphereObstacles); break;
+                    case CapsuleCollider cCollider: StoreCollision(new AirCapsuleCollider(cCollider, this), windSource, rigidbody, collisions.CapsuleWinds, collisions.CapsuleObstacles); break;
                     case BoxCollider bCollider: Debug.Log($"BoxCollider {bCollider.size}"); break;
-                    case CapsuleCollider cCollider: Debug.Log($"CapsuleCollider {cCollider.radius}, {cCollider.height}, {cCollider.direction}"); break;
                     case MeshCollider mCollider: Debug.Log($"MeshCollider {mCollider.sharedMesh}"); break;
                     case TerrainCollider tCollider: Debug.Log($"TerrainCollider {tCollider.terrainData}"); break;
                     case WheelCollider wCollider: Debug.Log($"WheelCollider {wCollider.center}"); break;
@@ -143,6 +147,8 @@ namespace AirFluid
         {
             foreach (var sphere in collisions.SphereWinds)
                 computer.SphereForce(sphere.collider.Center, sphere.collider.Radius, sphere.force * dt);
+            foreach (var capsule in collisions.CapsuleWinds)
+                computer.CapsuleForce(capsule.collider.Point1, capsule.collider.Point2, capsule.collider.Radius, capsule.force * dt);
         }
 
         internal Vector3 LocalToWorld(Vector3 point)
@@ -153,6 +159,11 @@ namespace AirFluid
         internal Vector3 WorldToLocal(Vector3 point)
         {
             return Quaternion.Inverse(transform.rotation) * (point - transform.position) / Scale;
+        }
+
+        internal float WorldToLocal(float distance)
+        {
+            return distance / Scale;
         }
 
         void GizmoDrawContour(params Vector3[] p)

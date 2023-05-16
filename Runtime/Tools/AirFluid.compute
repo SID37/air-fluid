@@ -1,5 +1,6 @@
 #pragma kernel Fill
 #pragma kernel SphereForce
+#pragma kernel CapsuleForce
 
 
 // ##########################
@@ -34,8 +35,8 @@ void Fill(uint3 id : SV_DispatchThreadID)
 // #       SphereForce      #
 // ##########################
 
-float3 SphereForceCenter;
 float3 SphereForceValue;
+float3 SphereForceCenter;
 float SphereForceRadius;
 
 [numthreads(16, 16, 2)]
@@ -43,10 +44,34 @@ void SphereForce(uint3 id : SV_DispatchThreadID)
 {
     if (!inStimulationArea(id))
         return;
-    float3 d = SphereForceCenter - id;
+    float3 d = id - SphereForceCenter;
     float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
     if (r2 <= SphereForceRadius * SphereForceRadius) {
         float4 cell = MainTexture[id];
         MainTexture[id] = float4(cell.xyz + SphereForceValue, cell.w);
+    }
+}
+
+// ##########################
+// #      CapsuleForce      #
+// ##########################
+
+float3 CapsuleForceValue;
+float3 CapsuleForcePoint;
+float3 CapsuleForceDirection;
+float CapsuleForceDividedHeight2;
+float CapsuleForceRadius;
+
+[numthreads(16, 16, 2)]
+void CapsuleForce(uint3 id : SV_DispatchThreadID)
+{
+    if (!inStimulationArea(id))
+        return;
+    float3 d = id - CapsuleForcePoint;
+    d -= CapsuleForceDirection * clamp(dot(d, CapsuleForceDirection) * CapsuleForceDividedHeight2, 0, 1);
+    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
+    if (r2 <= CapsuleForceRadius * CapsuleForceRadius) {
+        float4 cell = MainTexture[id];
+        MainTexture[id] = float4(cell.xyz + CapsuleForceValue, cell.w);
     }
 }

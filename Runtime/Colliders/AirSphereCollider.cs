@@ -12,9 +12,10 @@ namespace AirFluid
         public AirSphereCollider(SphereCollider collider, AirFluid fluids)
         {
             var globalCenter = collider.transform.TransformPoint(collider.center);
-            Center = fluids.WorldToLocal(globalCenter);
             var scale = collider.transform.lossyScale;
-            Radius = collider.radius * Mathf.Max(scale.x, scale.y, scale.z) / fluids.Scale;
+            var radius = collider.radius * Mathf.Max(scale.x, scale.y, scale.z);
+            Center = fluids.WorldToLocal(globalCenter);
+            Radius = fluids.WorldToLocal(radius);
         }
     }
 }

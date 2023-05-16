@@ -12,6 +12,7 @@ namespace AirFluid
             public int tempTexture;
             public FillKernel fill;
             public SphereForceKernel sphereForce;
+            public CapsuleForceKernel capsuleForce;
         }
 
         struct FillKernel
@@ -25,6 +26,16 @@ namespace AirFluid
             public int id;
             public int value;
             public int center;
+            public int radius;
+        }
+
+        struct CapsuleForceKernel
+        {
+            public int id;
+            public int value;
+            public int point;
+            public int direction;
+            public int dividedHeight2;
             public int radius;
         }
 
@@ -58,6 +69,14 @@ namespace AirFluid
             kernels.sphereForce.center = Shader.PropertyToID("SphereForceCenter");
             kernels.sphereForce.radius = Shader.PropertyToID("SphereForceRadius");
             InitCommonParameters(kernels.sphereForce.id);
+
+            kernels.capsuleForce.id = fluidShader.FindKernel("CapsuleForce");
+            kernels.capsuleForce.value = Shader.PropertyToID("CapsuleForceValue");
+            kernels.capsuleForce.point = Shader.PropertyToID("CapsuleForcePoint");
+            kernels.capsuleForce.direction = Shader.PropertyToID("CapsuleForceDirection");
+            kernels.capsuleForce.dividedHeight2 = Shader.PropertyToID("CapsuleForceDividedHeight2");
+            kernels.capsuleForce.radius = Shader.PropertyToID("CapsuleForceRadius");
+            InitCommonParameters(kernels.capsuleForce.id);
         }
 
         private void InitCommonParameters(int kernelId)
@@ -75,9 +94,24 @@ namespace AirFluid
         public void SphereForce(Vector3 center, float radius, Vector3 force)
         {
             fluidShader.SetVector(kernels.sphereForce.center, LocalToGrid(center));
-            fluidShader.SetVector(kernels.sphereForce.value, PackVelocity(force));
             fluidShader.SetFloat(kernels.sphereForce.radius, LocalToGrid(radius));
+            fluidShader.SetVector(kernels.sphereForce.value, PackVelocity(force));
             DispatchForAllGrid(kernels.sphereForce.id);
+        }
+
+        public void CapsuleForce(Vector3 Point1, Vector3 Point2, float radius, Vector3 force)
+        {
+            Debug.Log($"CapsuleForce({Point1}, {Point2}, {radius}, {force})");
+            var point1 = LocalToGrid(Point1);
+            var point2 = LocalToGrid(Point2);
+            var d = point2 - point1;
+            var height2 = d.x * d.x + d.y * d.y + d.z * d.z;
+            fluidShader.SetVector(kernels.capsuleForce.point, point1);
+            fluidShader.SetVector(kernels.capsuleForce.direction, d);
+            fluidShader.SetFloat(kernels.capsuleForce.dividedHeight2, 1 / height2);
+            fluidShader.SetFloat(kernels.capsuleForce.radius, LocalToGrid(radius));
+            fluidShader.SetVector(kernels.capsuleForce.value, PackVelocity(force));
+            DispatchForAllGrid(kernels.capsuleForce.id);
         }
 
         private Vector3 PackVelocity(Vector3 value)
