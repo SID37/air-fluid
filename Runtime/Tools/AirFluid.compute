@@ -1,6 +1,7 @@
 #pragma kernel Fill
 #pragma kernel SphereForce
 #pragma kernel CapsuleForce
+#pragma kernel BoxForce
 
 
 // ##########################
@@ -73,5 +74,27 @@ void CapsuleForce(uint3 id : SV_DispatchThreadID)
     if (r2 <= CapsuleForceRadius * CapsuleForceRadius) {
         float4 cell = MainTexture[id];
         MainTexture[id] = float4(cell.xyz + CapsuleForceValue, cell.w);
+    }
+}
+
+// ##########################
+// #        BoxForce        #
+// ##########################
+
+float3 BoxForceValue;
+float3 BoxForceCenter;
+float3 BoxForceHalfSize;
+float4x4 BoxForceRotation;
+
+[numthreads(16, 16, 2)]
+void BoxForce(uint3 id : SV_DispatchThreadID)
+{
+    if (!inStimulationArea(id))
+        return;
+    float3 d = id - BoxForceCenter;
+    d = abs(mul((float3x3)BoxForceRotation, d));
+    if (d.x < BoxForceHalfSize.x && d.y < BoxForceHalfSize.y && d.z < BoxForceHalfSize.z) {
+        float4 cell = MainTexture[id];
+        MainTexture[id] = float4(cell.xyz + BoxForceValue, cell.w);
     }
 }

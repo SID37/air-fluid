@@ -13,6 +13,7 @@ namespace AirFluid
             public FillKernel fill;
             public SphereForceKernel sphereForce;
             public CapsuleForceKernel capsuleForce;
+            public BoxForceKernel boxForce;
         }
 
         struct FillKernel
@@ -37,6 +38,15 @@ namespace AirFluid
             public int direction;
             public int dividedHeight2;
             public int radius;
+        }
+
+        struct BoxForceKernel
+        {
+            public int id;
+            public int value;
+            public int center;
+            public int halfSize;
+            public int rotation;
         }
 
         private FluidKernels kernels;
@@ -77,6 +87,13 @@ namespace AirFluid
             kernels.capsuleForce.dividedHeight2 = Shader.PropertyToID("CapsuleForceDividedHeight2");
             kernels.capsuleForce.radius = Shader.PropertyToID("CapsuleForceRadius");
             InitCommonParameters(kernels.capsuleForce.id);
+
+            kernels.boxForce.id = fluidShader.FindKernel("BoxForce");
+            kernels.boxForce.value = Shader.PropertyToID("BoxForceValue");
+            kernels.boxForce.center = Shader.PropertyToID("BoxForceCenter");
+            kernels.boxForce.halfSize = Shader.PropertyToID("BoxForceHalfSize");
+            kernels.boxForce.rotation = Shader.PropertyToID("BoxForceRotation");
+            InitCommonParameters(kernels.boxForce.id);
         }
 
         private void InitCommonParameters(int kernelId)
@@ -112,6 +129,15 @@ namespace AirFluid
             fluidShader.SetFloat(kernels.capsuleForce.radius, LocalToGrid(radius));
             fluidShader.SetVector(kernels.capsuleForce.value, PackVelocity(force));
             DispatchForAllGrid(kernels.capsuleForce.id);
+        }
+        
+        public void BoxForce(Vector3 center, Vector3 size, Matrix4x4 rotation, Vector3 force)
+        {
+            fluidShader.SetVector(kernels.boxForce.center, LocalToGrid(center));
+            fluidShader.SetVector(kernels.boxForce.halfSize, LocalToGrid(size / 2));
+            fluidShader.SetMatrix(kernels.boxForce.rotation, rotation);
+            fluidShader.SetVector(kernels.boxForce.value, PackVelocity(force));
+            DispatchForAllGrid(kernels.boxForce.id);
         }
 
         private Vector3 PackVelocity(Vector3 value)
