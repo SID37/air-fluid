@@ -11,9 +11,17 @@ namespace AirFluid
             public int mainTexture;
             public int tempTexture;
             public FillKernel fill;
+            public ProjectionKernel projection;
             public SphereForceKernel sphereForce;
             public CapsuleForceKernel capsuleForce;
             public BoxForceKernel boxForce;
+        }
+
+        struct ProjectionKernel
+        {
+            public int initId;
+            public int iterationId;
+            public int bakeId;
         }
 
         struct FillKernel
@@ -68,11 +76,18 @@ namespace AirFluid
             kernels.mainTexture = Shader.PropertyToID("MainTexture");
             kernels.tempTexture = Shader.PropertyToID("TempTexture");
             var gridSize = Blocks * AirConstants.blockSize;
-            fluidShader.SetInts("GridSize", new int[] {gridSize.x, gridSize.y, gridSize.z});
+            fluidShader.SetInts("GridSize", new int[] { gridSize.x, gridSize.y, gridSize.z });
 
             kernels.fill.id = fluidShader.FindKernel("Fill");
             kernels.fill.value = Shader.PropertyToID("FillValue");
             InitCommonParameters(kernels.fill.id);
+
+            kernels.projection.initId = fluidShader.FindKernel("ProjectInit");
+            kernels.projection.iterationId = fluidShader.FindKernel("ProjectIteration");
+            kernels.projection.bakeId = fluidShader.FindKernel("ProjectBake");
+            InitCommonParameters(kernels.projection.initId);
+            InitCommonParameters(kernels.projection.iterationId);
+            InitCommonParameters(kernels.projection.bakeId);
 
             kernels.sphereForce.id = fluidShader.FindKernel("SphereForce");
             kernels.sphereForce.value = Shader.PropertyToID("SphereForceValue");
@@ -108,6 +123,14 @@ namespace AirFluid
             DispatchForAllGrid(kernels.fill.id);
         }
 
+        public void Projection(int iterations = 20)
+        {
+            DispatchForAllGrid(kernels.projection.initId);
+            for (int i = 0; i < iterations; ++i)
+                DispatchForAllGrid(kernels.projection.iterationId);
+            DispatchForAllGrid(kernels.projection.bakeId);
+        }
+
         public void SphereForce(Vector3 center, float radius, Vector3 force)
         {
             fluidShader.SetVector(kernels.sphereForce.center, LocalToGrid(center));
@@ -130,7 +153,7 @@ namespace AirFluid
             fluidShader.SetVector(kernels.capsuleForce.value, PackVelocity(force));
             DispatchForAllGrid(kernels.capsuleForce.id);
         }
-        
+
         public void BoxForce(Vector3 center, Vector3 size, Matrix4x4 rotation, Vector3 force)
         {
             fluidShader.SetVector(kernels.boxForce.center, LocalToGrid(center));

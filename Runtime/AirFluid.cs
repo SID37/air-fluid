@@ -76,6 +76,7 @@ namespace AirFluid
             var dt = Time.deltaTime;
             UpdateCollisions();
             ApplyWind(dt);
+            computer.Projection();
         }
 
         private void UpdateCollisions()

@@ -2,7 +2,12 @@
 #pragma kernel SphereForce
 #pragma kernel CapsuleForce
 #pragma kernel BoxForce
+#pragma kernel ProjectInit
+#pragma kernel ProjectIteration
+#pragma kernel ProjectBake
 
+#pragma warning(disable : 4008) // WARN_FLOAT_DIVISION_BY_ZERO
+const static float NaN = 0.0f / 0.0f;
 
 // ##########################
 // #         Common         #
@@ -10,9 +15,9 @@
 
 RWTexture3D<float4> MainTexture;
 RWTexture3D<float4> TempTexture;
-uint3 GridSize;    // blocks * blockSize
+uint3 GridSize;     // blocks * blockSize
 
-bool inStimulationArea(uint3 id) {
+bool inSimulationArea(uint3 id) {
     return
         id.x > 0 && id.y > 0 && id.z > 0
         && id.x < GridSize.x - 1
@@ -32,6 +37,92 @@ void Fill(uint3 id : SV_DispatchThreadID)
     MainTexture[id] = FillValue;
 }
 
+
+// ##########################
+// #       Projection       #
+// ##########################
+
+
+[numthreads(16, 16, 2)]
+void ProjectInit(uint3 id : SV_DispatchThreadID)
+{
+    uint3 target = id;
+    float3 flip = float3(0, 0, 0);
+    bool in_sim = true;
+    if (id.x == 0) { target.x += 1; flip.x = -1; in_sim = false; }
+    if (id.y == 0) { target.y += 1; flip.y = -1; in_sim = false; }
+    if (id.z == 0) { target.z += 1; flip.z = -1; in_sim = false; }
+    if (id.x == GridSize.x - 1) { target.x -= 1; flip.x = -1; in_sim = false; }
+    if (id.y == GridSize.y - 1) { target.y -= 1; flip.y = -1; in_sim = false; }
+    if (id.z == GridSize.z - 1) { target.z -= 1; flip.z = -1; in_sim = false; }
+    float4 value = MainTexture[target];
+    value.xyz = value.xyz * GridSize;
+    float4 result = in_sim ?
+        float4(value.xyz, isnan(value.w) ? value.w : 0) :
+        float4(value.xyz * flip, NaN);
+    MainTexture[id] = result;
+}
+
+[numthreads(16, 16, 2)]
+void ProjectIteration(uint3 id : SV_DispatchThreadID)
+{
+    float4 value = MainTexture[id];
+    if (isnan(value.w))
+        return;
+
+    float4 vx_p = MainTexture[id + uint3(1, 0, 0)];
+    float4 vy_p = MainTexture[id + uint3(0, 1, 0)];
+    float4 vz_p = MainTexture[id + uint3(0, 0, 1)];
+
+    float4 vx_n = MainTexture[id - uint3(1, 0, 0)];
+    float4 vy_n = MainTexture[id - uint3(0, 1, 0)];
+    float4 vz_n = MainTexture[id - uint3(0, 0, 1)];
+
+    float div = 0.5 * (
+        + vx_p.x - vx_n.x
+        + vy_p.y - vy_n.y
+        + vz_p.z - vz_n.z
+    );
+
+    float p =
+        + (isnan(vx_p.w) ? 0 : vx_p.w)
+        + (isnan(vx_n.w) ? 0 : vx_n.w)
+        + (isnan(vy_p.w) ? 0 : vy_p.w)
+        + (isnan(vy_n.w) ? 0 : vy_n.w)
+        + (isnan(vz_p.w) ? 0 : vz_p.w)
+        + (isnan(vz_n.w) ? 0 : vz_n.w);
+
+    MainTexture[id] = float4(value.xyz, (p - div) * (1.0 / 6.0));
+}
+
+[numthreads(16, 16, 2)]
+void ProjectBake(uint3 id : SV_DispatchThreadID)
+{
+    float4 value = MainTexture[id];
+    float4 vx_p = MainTexture[id + uint3(1, 0, 0)];
+    float4 vy_p = MainTexture[id + uint3(0, 1, 0)];
+    float4 vz_p = MainTexture[id + uint3(0, 0, 1)];
+
+    float4 vx_n = MainTexture[id - uint3(1, 0, 0)];
+    float4 vy_n = MainTexture[id - uint3(0, 1, 0)];
+    float4 vz_n = MainTexture[id - uint3(0, 0, 1)];
+
+    float3 result = value.xyz;
+    if (!isnan(value.w))
+    {
+        float3 grad_p = 0.5 * float3(
+            + (isnan(vx_p.w) ? 0 : vx_p.w)
+            - (isnan(vx_n.w) ? 0 : vx_n.w),
+            + (isnan(vy_p.w) ? 0 : vy_p.w)
+            - (isnan(vy_n.w) ? 0 : vy_n.w),
+            + (isnan(vz_p.w) ? 0 : vz_p.w)
+            - (isnan(vz_n.w) ? 0 : vz_n.w)
+        );
+        result -= grad_p;
+    }
+    MainTexture[id] = float4(result / GridSize, 0);
+}
+
 // ##########################
 // #       SphereForce      #
 // ##########################
@@ -43,7 +134,7 @@ float SphereForceRadius;
 [numthreads(16, 16, 2)]
 void SphereForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inStimulationArea(id))
+    if (!inSimulationArea(id))
         return;
     float3 d = id - SphereForceCenter;
     float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
@@ -66,7 +157,7 @@ float CapsuleForceRadius;
 [numthreads(16, 16, 2)]
 void CapsuleForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inStimulationArea(id))
+    if (!inSimulationArea(id))
         return;
     float3 d = id - CapsuleForcePoint;
     d -= CapsuleForceDirection * clamp(dot(d, CapsuleForceDirection) * CapsuleForceDividedHeight2, 0, 1);
@@ -89,7 +180,7 @@ float4x4 BoxForceRotation;
 [numthreads(16, 16, 2)]
 void BoxForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inStimulationArea(id))
+    if (!inSimulationArea(id))
         return;
     float3 d = id - BoxForceCenter;
     d = abs(mul((float3x3)BoxForceRotation, d));
