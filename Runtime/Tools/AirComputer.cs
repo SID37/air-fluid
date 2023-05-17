@@ -12,6 +12,7 @@ namespace AirFluid
             public int tempTexture;
             public FillKernel fill;
             public ProjectionKernel projection;
+            public AdvectionKernel advection;
             public SphereForceKernel sphereForce;
             public CapsuleForceKernel capsuleForce;
             public BoxForceKernel boxForce;
@@ -22,6 +23,13 @@ namespace AirFluid
             public int initId;
             public int iterationId;
             public int bakeId;
+        }
+
+        struct AdvectionKernel
+        {
+            public int id;
+            public int deltaTime;
+            public int tempToMainId;
         }
 
         struct FillKernel
@@ -89,6 +97,12 @@ namespace AirFluid
             InitCommonParameters(kernels.projection.iterationId);
             InitCommonParameters(kernels.projection.bakeId);
 
+            kernels.advection.id = fluidShader.FindKernel("Advection");
+            kernels.advection.deltaTime = Shader.PropertyToID("AdvectionDeltaTime");
+            kernels.advection.tempToMainId = fluidShader.FindKernel("TempToMain");
+            InitCommonParameters(kernels.advection.id);
+            InitCommonParameters(kernels.advection.tempToMainId);
+
             kernels.sphereForce.id = fluidShader.FindKernel("SphereForce");
             kernels.sphereForce.value = Shader.PropertyToID("SphereForceValue");
             kernels.sphereForce.center = Shader.PropertyToID("SphereForceCenter");
@@ -129,6 +143,13 @@ namespace AirFluid
             for (int i = 0; i < iterations; ++i)
                 DispatchForAllGrid(kernels.projection.iterationId);
             DispatchForAllGrid(kernels.projection.bakeId);
+        }
+
+        public void Advection(float dt)
+        {
+            fluidShader.SetFloat(kernels.advection.deltaTime, dt);
+            DispatchForAllGrid(kernels.advection.id);
+            DispatchForAllGrid(kernels.advection.tempToMainId);
         }
 
         public void SphereForce(Vector3 center, float radius, Vector3 force)

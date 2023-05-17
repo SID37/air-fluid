@@ -5,6 +5,8 @@
 #pragma kernel ProjectInit
 #pragma kernel ProjectIteration
 #pragma kernel ProjectBake
+#pragma kernel Advection
+#pragma kernel TempToMain
 
 #pragma warning(disable : 4008) // WARN_FLOAT_DIVISION_BY_ZERO
 const static float NaN = 0.0f / 0.0f;
@@ -121,6 +123,48 @@ void ProjectBake(uint3 id : SV_DispatchThreadID)
         result -= grad_p;
     }
     MainTexture[id] = float4(result / GridSize, 0);
+}
+
+// ##########################
+// #       Projection       #
+// ##########################
+
+float AdvectionDeltaTime;
+
+[numthreads(16, 16, 2)]
+void Advection(uint3 id : SV_DispatchThreadID)
+{
+    if (!inSimulationArea(id))
+        return;
+    float4 value = MainTexture[id];
+    float3 delta = value.xyz * GridSize * AdvectionDeltaTime;
+    float3 p = id - delta;
+    if (p.x < 0) p.x = 0;
+    if (p.y < 0) p.y = 0;
+    if (p.z < 0) p.z = 0;
+    if (p.x >= GridSize.x - 1) p.x = GridSize.x - (1 + 1e-5f);
+    if (p.y >= GridSize.y - 1) p.y = GridSize.y - (1 + 1e-5f);
+    if (p.z >= GridSize.z - 1) p.z = GridSize.z - (1 + 1e-5f);
+
+    uint3 int_p = floor(p);
+    float3 dp = p - int_p;
+    float3 dn = 1 - dp;
+    TempTexture[id] = (
+        + MainTexture[int_p + uint3(0, 0, 0)] * dn.x * dn.y * dn.z
+        + MainTexture[int_p + uint3(0, 0, 1)] * dn.x * dn.y * dp.z
+        + MainTexture[int_p + uint3(0, 1, 0)] * dn.x * dp.y * dn.z
+        + MainTexture[int_p + uint3(0, 1, 1)] * dn.x * dp.y * dp.z
+        + MainTexture[int_p + uint3(1, 0, 0)] * dp.x * dn.y * dn.z
+        + MainTexture[int_p + uint3(1, 0, 1)] * dp.x * dn.y * dp.z
+        + MainTexture[int_p + uint3(1, 1, 0)] * dp.x * dp.y * dn.z
+        + MainTexture[int_p + uint3(1, 1, 1)] * dp.x * dp.y * dp.z
+    );
+}
+
+[numthreads(16, 16, 2)]
+void TempToMain(uint3 id : SV_DispatchThreadID)
+{
+    MainTexture[id] = TempTexture[id];
 }
 
 // ##########################

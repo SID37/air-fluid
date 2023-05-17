@@ -74,7 +74,9 @@ namespace AirFluid
         private void FixedUpdate()
         {
             var dt = Time.deltaTime;
+
             UpdateCollisions();
+            computer.Advection(dt);
             ApplyWind(dt);
             computer.Projection();
         }
