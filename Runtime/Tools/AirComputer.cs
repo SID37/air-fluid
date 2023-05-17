@@ -13,9 +13,8 @@ namespace AirFluid
             public FillKernel fill;
             public ProjectionKernel projection;
             public AdvectionKernel advection;
-            public SphereForceKernel sphereForce;
-            public CapsuleForceKernel capsuleForce;
-            public BoxForceKernel boxForce;
+            public CollidersKernel colliders;
+            public ForcesKernel forces;
         }
 
         struct ProjectionKernel
@@ -38,31 +37,26 @@ namespace AirFluid
             public int value;
         }
 
-        struct SphereForceKernel
+        struct CollidersKernel
         {
-            public int id;
-            public int value;
-            public int center;
+            public int sphereCenter;
+            public int sphereRadius;
             public int radius;
+            public int capsulePoint;
+            public int capsuleDirection;
+            public int capsuleDividedHeight2;
+            public int capsuleRadius;
+            public int boxCenter;
+            public int boxHalfSize;
+            public int boxRotation;
         }
 
-        struct CapsuleForceKernel
+        struct ForcesKernel
         {
-            public int id;
-            public int value;
-            public int point;
-            public int direction;
-            public int dividedHeight2;
-            public int radius;
-        }
-
-        struct BoxForceKernel
-        {
-            public int id;
-            public int value;
-            public int center;
-            public int halfSize;
-            public int rotation;
+            public int sphereId;
+            public int capsuleId;
+            public int boxId;
+            public int forceValue;
         }
 
         private FluidKernels kernels;
@@ -103,26 +97,23 @@ namespace AirFluid
             InitCommonParameters(kernels.advection.id);
             InitCommonParameters(kernels.advection.tempToMainId);
 
-            kernels.sphereForce.id = fluidShader.FindKernel("SphereForce");
-            kernels.sphereForce.value = Shader.PropertyToID("SphereForceValue");
-            kernels.sphereForce.center = Shader.PropertyToID("SphereForceCenter");
-            kernels.sphereForce.radius = Shader.PropertyToID("SphereForceRadius");
-            InitCommonParameters(kernels.sphereForce.id);
+            kernels.colliders.sphereCenter = Shader.PropertyToID("SphereCenter");
+            kernels.colliders.sphereRadius = Shader.PropertyToID("SphereRadius");
+            kernels.colliders.capsulePoint = Shader.PropertyToID("CapsulePoint");
+            kernels.colliders.capsuleDirection = Shader.PropertyToID("CapsuleDirection");
+            kernels.colliders.capsuleDividedHeight2 = Shader.PropertyToID("CapsuleDividedHeight2");
+            kernels.colliders.capsuleRadius = Shader.PropertyToID("CapsuleRadius");
+            kernels.colliders.boxCenter = Shader.PropertyToID("BoxCenter");
+            kernels.colliders.boxHalfSize = Shader.PropertyToID("BoxHalfSize");
+            kernels.colliders.boxRotation = Shader.PropertyToID("BoxRotation");
 
-            kernels.capsuleForce.id = fluidShader.FindKernel("CapsuleForce");
-            kernels.capsuleForce.value = Shader.PropertyToID("CapsuleForceValue");
-            kernels.capsuleForce.point = Shader.PropertyToID("CapsuleForcePoint");
-            kernels.capsuleForce.direction = Shader.PropertyToID("CapsuleForceDirection");
-            kernels.capsuleForce.dividedHeight2 = Shader.PropertyToID("CapsuleForceDividedHeight2");
-            kernels.capsuleForce.radius = Shader.PropertyToID("CapsuleForceRadius");
-            InitCommonParameters(kernels.capsuleForce.id);
-
-            kernels.boxForce.id = fluidShader.FindKernel("BoxForce");
-            kernels.boxForce.value = Shader.PropertyToID("BoxForceValue");
-            kernels.boxForce.center = Shader.PropertyToID("BoxForceCenter");
-            kernels.boxForce.halfSize = Shader.PropertyToID("BoxForceHalfSize");
-            kernels.boxForce.rotation = Shader.PropertyToID("BoxForceRotation");
-            InitCommonParameters(kernels.boxForce.id);
+            kernels.forces.sphereId = fluidShader.FindKernel("SphereForce");
+            kernels.forces.capsuleId = fluidShader.FindKernel("CapsuleForce");
+            kernels.forces.boxId = fluidShader.FindKernel("BoxForce");
+            kernels.forces.forceValue = Shader.PropertyToID("ForceValue");
+            InitCommonParameters(kernels.forces.sphereId);
+            InitCommonParameters(kernels.forces.capsuleId);
+            InitCommonParameters(kernels.forces.boxId);
         }
 
         private void InitCommonParameters(int kernelId)
@@ -154,34 +145,34 @@ namespace AirFluid
 
         public void SphereForce(Vector3 center, float radius, Vector3 force)
         {
-            fluidShader.SetVector(kernels.sphereForce.center, LocalToGrid(center));
-            fluidShader.SetFloat(kernels.sphereForce.radius, LocalToGrid(radius));
-            fluidShader.SetVector(kernels.sphereForce.value, PackVelocity(force));
-            DispatchForAllGrid(kernels.sphereForce.id);
+            Debug.Log($"SphereForce({center}, {radius}, {force})");
+            fluidShader.SetVector(kernels.colliders.sphereCenter, LocalToGrid(center));
+            fluidShader.SetFloat(kernels.colliders.sphereRadius, LocalToGrid(radius));
+            fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
+            DispatchForAllGrid(kernels.forces.sphereId);
         }
 
         public void CapsuleForce(Vector3 Point1, Vector3 Point2, float radius, Vector3 force)
         {
-            Debug.Log($"CapsuleForce({Point1}, {Point2}, {radius}, {force})");
             var point1 = LocalToGrid(Point1);
             var point2 = LocalToGrid(Point2);
             var d = point2 - point1;
             var height2 = d.x * d.x + d.y * d.y + d.z * d.z;
-            fluidShader.SetVector(kernels.capsuleForce.point, point1);
-            fluidShader.SetVector(kernels.capsuleForce.direction, d);
-            fluidShader.SetFloat(kernels.capsuleForce.dividedHeight2, 1 / height2);
-            fluidShader.SetFloat(kernels.capsuleForce.radius, LocalToGrid(radius));
-            fluidShader.SetVector(kernels.capsuleForce.value, PackVelocity(force));
-            DispatchForAllGrid(kernels.capsuleForce.id);
+            fluidShader.SetVector(kernels.colliders.capsulePoint, point1);
+            fluidShader.SetVector(kernels.colliders.capsuleDirection, d);
+            fluidShader.SetFloat(kernels.colliders.capsuleDividedHeight2, 1 / height2);
+            fluidShader.SetFloat(kernels.colliders.capsuleRadius, LocalToGrid(radius));
+            fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
+            DispatchForAllGrid(kernels.forces.capsuleId);
         }
 
         public void BoxForce(Vector3 center, Vector3 size, Matrix4x4 rotation, Vector3 force)
         {
-            fluidShader.SetVector(kernels.boxForce.center, LocalToGrid(center));
-            fluidShader.SetVector(kernels.boxForce.halfSize, LocalToGrid(size / 2));
-            fluidShader.SetMatrix(kernels.boxForce.rotation, rotation);
-            fluidShader.SetVector(kernels.boxForce.value, PackVelocity(force));
-            DispatchForAllGrid(kernels.boxForce.id);
+            fluidShader.SetVector(kernels.colliders.boxCenter, LocalToGrid(center));
+            fluidShader.SetVector(kernels.colliders.boxHalfSize, LocalToGrid(size / 2));
+            fluidShader.SetMatrix(kernels.colliders.boxRotation, rotation);
+            fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
+            DispatchForAllGrid(kernels.forces.boxId);
         }
 
         private Vector3 PackVelocity(Vector3 value)

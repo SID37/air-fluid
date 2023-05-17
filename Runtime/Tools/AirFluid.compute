@@ -142,9 +142,9 @@ void Advection(uint3 id : SV_DispatchThreadID)
     if (p.x < 0) p.x = 0;
     if (p.y < 0) p.y = 0;
     if (p.z < 0) p.z = 0;
-    if (p.x >= GridSize.x - 1) p.x = GridSize.x - (1 + 1e-5f);
-    if (p.y >= GridSize.y - 1) p.y = GridSize.y - (1 + 1e-5f);
-    if (p.z >= GridSize.z - 1) p.z = GridSize.z - (1 + 1e-5f);
+    if (p.x >= int(GridSize.x) - 1) p.x = GridSize.x - (1 + 1e-5f);
+    if (p.y >= int(GridSize.y) - 1) p.y = GridSize.y - (1 + 1e-5f);
+    if (p.z >= int(GridSize.z) - 1) p.z = GridSize.z - (1 + 1e-5f);
 
     uint3 int_p = floor(p);
     float3 dp = p - int_p;
@@ -167,69 +167,78 @@ void TempToMain(uint3 id : SV_DispatchThreadID)
     MainTexture[id] = TempTexture[id];
 }
 
+
 // ##########################
-// #       SphereForce      #
+// #        Colliders       #
 // ##########################
 
-float3 SphereForceValue;
-float3 SphereForceCenter;
-float SphereForceRadius;
+float3 SphereCenter;
+float SphereRadius;
+
+bool collideSphere(uint3 id)
+{
+    float3 d = id - SphereCenter;
+    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
+    return r2 <= SphereRadius * SphereRadius;
+}
+
+float3 CapsulePoint;
+float3 CapsuleDirection;
+float CapsuleDividedHeight2;
+float CapsuleRadius;
+
+bool collideCapsule(uint3 id)
+{
+    float3 d = id - CapsulePoint;
+    d -= CapsuleDirection * clamp(dot(d, CapsuleDirection) * CapsuleDividedHeight2, 0, 1);
+    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
+    return r2 <= CapsuleRadius * CapsuleRadius;
+}
+
+float3 BoxCenter;
+float3 BoxHalfSize;
+float4x4 BoxRotation;
+
+bool collideBox(uint3 id)
+{
+    float3 d = id - BoxCenter;
+    d = abs(mul((float3x3)BoxRotation, d));
+    return d.x < BoxHalfSize.x && d.y < BoxHalfSize.y && d.z < BoxHalfSize.z;
+}
+
+
+// ##########################
+// #          Force         #
+// ##########################
+
+float3 ForceValue;
+
+void applyForce(uint3 id)
+{
+    float4 cell = MainTexture[id];
+    MainTexture[id] = float4(cell.xyz + ForceValue, cell.w);
+}
 
 [numthreads(16, 16, 2)]
 void SphereForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inSimulationArea(id))
-        return;
-    float3 d = id - SphereForceCenter;
-    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
-    if (r2 <= SphereForceRadius * SphereForceRadius) {
-        float4 cell = MainTexture[id];
-        MainTexture[id] = float4(cell.xyz + SphereForceValue, cell.w);
-    }
+    if (!inSimulationArea(id)) return;
+    if (!collideSphere(id)) return;
+    applyForce(id);
 }
-
-// ##########################
-// #      CapsuleForce      #
-// ##########################
-
-float3 CapsuleForceValue;
-float3 CapsuleForcePoint;
-float3 CapsuleForceDirection;
-float CapsuleForceDividedHeight2;
-float CapsuleForceRadius;
 
 [numthreads(16, 16, 2)]
 void CapsuleForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inSimulationArea(id))
-        return;
-    float3 d = id - CapsuleForcePoint;
-    d -= CapsuleForceDirection * clamp(dot(d, CapsuleForceDirection) * CapsuleForceDividedHeight2, 0, 1);
-    float r2 = d.x * d.x + d.y * d.y + d.z * d.z;
-    if (r2 <= CapsuleForceRadius * CapsuleForceRadius) {
-        float4 cell = MainTexture[id];
-        MainTexture[id] = float4(cell.xyz + CapsuleForceValue, cell.w);
-    }
+    if (!inSimulationArea(id)) return;
+    if (!collideCapsule(id)) return;
+    applyForce(id);
 }
-
-// ##########################
-// #        BoxForce        #
-// ##########################
-
-float3 BoxForceValue;
-float3 BoxForceCenter;
-float3 BoxForceHalfSize;
-float4x4 BoxForceRotation;
 
 [numthreads(16, 16, 2)]
 void BoxForce(uint3 id : SV_DispatchThreadID)
 {
-    if (!inSimulationArea(id))
-        return;
-    float3 d = id - BoxForceCenter;
-    d = abs(mul((float3x3)BoxForceRotation, d));
-    if (d.x < BoxForceHalfSize.x && d.y < BoxForceHalfSize.y && d.z < BoxForceHalfSize.z) {
-        float4 cell = MainTexture[id];
-        MainTexture[id] = float4(cell.xyz + BoxForceValue, cell.w);
-    }
+    if (!inSimulationArea(id)) return;
+    if (!collideBox(id)) return;
+    applyForce(id);
 }

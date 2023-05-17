@@ -16,8 +16,8 @@ namespace AirFluid
         void OnDrawGizmosSelected()
         {
             Gizmos.color = Color.green;
-            Gizmos.DrawLine(transform.position, transform.position + WorldForce);
-            Gizmos.DrawSphere(transform.position + WorldForce, force.magnitude / 10);
+            Gizmos.DrawLine(transform.position, transform.position + WorldForce / 10);
+            Gizmos.DrawSphere(transform.position + WorldForce / 10, force.magnitude / 100);
         }
 
         void OnDrawGizmos()
