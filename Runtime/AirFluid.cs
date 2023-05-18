@@ -78,6 +78,7 @@ namespace AirFluid
             UpdateCollisions();
             computer.Advection(dt);
             ApplyWind(dt);
+            ApplyObstacles(dt);
             computer.Projection();
         }
 
@@ -146,18 +147,34 @@ namespace AirFluid
             }
             else
             {
-                // TODO: store obstacle
+                var invertRotation = Quaternion.Inverse(transform.rotation);
+                var zero = new Vector3(0, 0, 0);
+                obstacleList.Add(new Collisions.Obstacle<T>() {
+                    collider = collider,
+                    angularVelocity = body == null ? zero: invertRotation * body.angularVelocity,
+                    velocity = body == null ? zero : invertRotation * body.velocity / Scale,
+                });
             }
         }
 
         private void ApplyWind(float dt)
         {
-            foreach (var sphere in collisions.SphereWinds)
-                computer.SphereForce(sphere.collider.Center, sphere.collider.Radius, sphere.force * dt);
-            foreach (var capsule in collisions.CapsuleWinds)
-                computer.CapsuleForce(capsule.collider.Point1, capsule.collider.Point2, capsule.collider.Radius, capsule.force * dt);
-            foreach (var box in collisions.BoxWinds)
-                computer.BoxForce(box.collider.Center, box.collider.Size, box.collider.Rotation, box.force * dt);
+            foreach (var w in collisions.SphereWinds)
+                computer.SphereForce(w.collider.Center, w.collider.Radius, w.force * dt);
+            foreach (var w in collisions.CapsuleWinds)
+                computer.CapsuleForce(w.collider.Point1, w.collider.Point2, w.collider.Radius, w.force * dt);
+            foreach (var w in collisions.BoxWinds)
+                computer.BoxForce(w.collider.Center, w.collider.Size, w.collider.Rotation, w.force * dt);
+        }
+
+        private void ApplyObstacles(float dt)
+        {
+            foreach (var o in collisions.SphereObstacles)
+                computer.SphereObstacle(o.collider.Center, o.collider.Radius, o.velocity, o.angularVelocity);
+            foreach (var o in collisions.CapsuleObstacles)
+                computer.CapsuleObstacle(o.collider.Point1, o.collider.Point2, o.collider.Radius, o.velocity, o.angularVelocity);
+            foreach (var o in collisions.BoxObstacles)
+                computer.BoxObstacle(o.collider.Center, o.collider.Size, o.collider.Rotation, o.velocity, o.angularVelocity);
         }
 
         internal Vector3 LocalToWorld(Vector3 point)

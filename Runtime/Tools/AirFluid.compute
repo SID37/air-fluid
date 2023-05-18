@@ -1,12 +1,20 @@
 #pragma kernel Fill
-#pragma kernel SphereForce
-#pragma kernel CapsuleForce
-#pragma kernel BoxForce
+
 #pragma kernel ProjectInit
 #pragma kernel ProjectIteration
 #pragma kernel ProjectBake
+
 #pragma kernel Advection
 #pragma kernel TempToMain
+
+#pragma kernel SphereForce
+#pragma kernel CapsuleForce
+#pragma kernel BoxForce
+
+#pragma kernel SphereObstacle
+#pragma kernel CapsuleObstacle
+#pragma kernel BoxObstacle
+
 
 #pragma warning(disable : 4008) // WARN_FLOAT_DIVISION_BY_ZERO
 const static float NaN = 0.0f / 0.0f;
@@ -126,7 +134,7 @@ void ProjectBake(uint3 id : SV_DispatchThreadID)
 }
 
 // ##########################
-// #       Projection       #
+// #       Advection        #
 // ##########################
 
 float AdvectionDeltaTime;
@@ -241,4 +249,44 @@ void BoxForce(uint3 id : SV_DispatchThreadID)
     if (!inSimulationArea(id)) return;
     if (!collideBox(id)) return;
     applyForce(id);
+}
+
+
+// ##########################
+// #        Obstacles       #
+// ##########################
+
+float3 ObstacleVelocity;
+float3 ObstacleAngularVelocity;
+float3 ObstacleRotationCenter;
+
+void applyObstacle(uint3 id)
+{
+    float3 d = id - ObstacleRotationCenter;
+    float3 vel = cross(ObstacleAngularVelocity, d);
+    MainTexture[id] = float4(ObstacleVelocity + vel / GridSize, NaN);
+}
+
+[numthreads(16, 16, 2)]
+void SphereObstacle(uint3 id : SV_DispatchThreadID)
+{
+    if (!inSimulationArea(id)) return;
+    if (!collideSphere(id)) return;
+    applyObstacle(id);
+}
+
+[numthreads(16, 16, 2)]
+void CapsuleObstacle(uint3 id : SV_DispatchThreadID)
+{
+    if (!inSimulationArea(id)) return;
+    if (!collideCapsule(id)) return;
+    applyObstacle(id);
+}
+
+[numthreads(16, 16, 2)]
+void BoxObstacle(uint3 id : SV_DispatchThreadID)
+{
+    if (!inSimulationArea(id)) return;
+    if (!collideBox(id)) return;
+    applyObstacle(id);
 }

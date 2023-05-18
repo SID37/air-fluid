@@ -15,6 +15,7 @@ namespace AirFluid
             public AdvectionKernel advection;
             public CollidersKernel colliders;
             public ForcesKernel forces;
+            public ObstaclesKernel obstacles;
         }
 
         struct ProjectionKernel
@@ -57,6 +58,16 @@ namespace AirFluid
             public int capsuleId;
             public int boxId;
             public int forceValue;
+        }
+
+        struct ObstaclesKernel
+        {
+            public int sphereId;
+            public int capsuleId;
+            public int boxId;
+            public int velocity;
+            public int angularVelocity;
+            public int rotationCenter;
         }
 
         private FluidKernels kernels;
@@ -114,6 +125,16 @@ namespace AirFluid
             InitCommonParameters(kernels.forces.sphereId);
             InitCommonParameters(kernels.forces.capsuleId);
             InitCommonParameters(kernels.forces.boxId);
+
+            kernels.obstacles.sphereId = fluidShader.FindKernel("SphereObstacle");
+            kernels.obstacles.capsuleId = fluidShader.FindKernel("CapsuleObstacle");
+            kernels.obstacles.boxId = fluidShader.FindKernel("BoxObstacle");
+            kernels.obstacles.velocity = Shader.PropertyToID("ObstacleVelocity");
+            kernels.obstacles.angularVelocity = Shader.PropertyToID("ObstacleAngularVelocity");
+            kernels.obstacles.rotationCenter = Shader.PropertyToID("ObstacleRotationCenter");
+            InitCommonParameters(kernels.obstacles.sphereId);
+            InitCommonParameters(kernels.obstacles.capsuleId);
+            InitCommonParameters(kernels.obstacles.boxId);
         }
 
         private void InitCommonParameters(int kernelId)
@@ -145,34 +166,76 @@ namespace AirFluid
 
         public void SphereForce(Vector3 center, float radius, Vector3 force)
         {
-            Debug.Log($"SphereForce({center}, {radius}, {force})");
-            fluidShader.SetVector(kernels.colliders.sphereCenter, LocalToGrid(center));
-            fluidShader.SetFloat(kernels.colliders.sphereRadius, LocalToGrid(radius));
+            ConfigureSphere(center, radius);
             fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
             DispatchForAllGrid(kernels.forces.sphereId);
         }
 
-        public void CapsuleForce(Vector3 Point1, Vector3 Point2, float radius, Vector3 force)
+        public void CapsuleForce(Vector3 point1, Vector3 point2, float radius, Vector3 force)
         {
-            var point1 = LocalToGrid(Point1);
-            var point2 = LocalToGrid(Point2);
-            var d = point2 - point1;
-            var height2 = d.x * d.x + d.y * d.y + d.z * d.z;
-            fluidShader.SetVector(kernels.colliders.capsulePoint, point1);
-            fluidShader.SetVector(kernels.colliders.capsuleDirection, d);
-            fluidShader.SetFloat(kernels.colliders.capsuleDividedHeight2, 1 / height2);
-            fluidShader.SetFloat(kernels.colliders.capsuleRadius, LocalToGrid(radius));
+            ConfigureCapsule(point1, point2, radius);
             fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
             DispatchForAllGrid(kernels.forces.capsuleId);
         }
 
         public void BoxForce(Vector3 center, Vector3 size, Matrix4x4 rotation, Vector3 force)
         {
+            ConfigureBox(center, size, rotation);
+            fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
+            DispatchForAllGrid(kernels.forces.boxId);
+        }
+
+        public void SphereObstacle(Vector3 center, float radius, Vector3 velocity, Vector3 angularVelocity)
+        {
+            ConfigureSphere(center, radius);
+            ConfigureObstacle(velocity, angularVelocity, center);
+            DispatchForAllGrid(kernels.obstacles.sphereId);
+        }
+
+        public void CapsuleObstacle(Vector3 point1, Vector3 point2, float radius, Vector3 velocity, Vector3 angularVelocity)
+        {
+            ConfigureCapsule(point1, point2, radius);
+            ConfigureObstacle(velocity, angularVelocity, (point1 + point2) / 2);
+            DispatchForAllGrid(kernels.obstacles.capsuleId);
+        }
+
+        public void BoxObstacle(Vector3 center, Vector3 size, Matrix4x4 rotation, Vector3 velocity, Vector3 angularVelocity)
+        {
+            ConfigureBox(center, size, rotation);
+            ConfigureObstacle(velocity, angularVelocity, center);
+            DispatchForAllGrid(kernels.obstacles.boxId);
+        }
+
+        private void ConfigureObstacle(Vector3 velocity, Vector3 angularVelocity, Vector3 center)
+        {
+            fluidShader.SetVector(kernels.obstacles.velocity, PackVelocity(velocity));
+            fluidShader.SetVector(kernels.obstacles.angularVelocity, angularVelocity);
+            fluidShader.SetVector(kernels.obstacles.rotationCenter, LocalToGrid(center));
+        }
+
+        private void ConfigureSphere(Vector3 center, float radius)
+        {
+            fluidShader.SetVector(kernels.colliders.sphereCenter, LocalToGrid(center));
+            fluidShader.SetFloat(kernels.colliders.sphereRadius, LocalToGrid(radius));
+        }
+
+        private void ConfigureCapsule(Vector3 point1, Vector3 point2, float radius)
+        {
+            var p1 = LocalToGrid(point1);
+            var p2 = LocalToGrid(point2);
+            var d = p2 - p1;
+            var height2 = d.x * d.x + d.y * d.y + d.z * d.z;
+            fluidShader.SetVector(kernels.colliders.capsulePoint, p1);
+            fluidShader.SetVector(kernels.colliders.capsuleDirection, d);
+            fluidShader.SetFloat(kernels.colliders.capsuleDividedHeight2, 1 / height2);
+            fluidShader.SetFloat(kernels.colliders.capsuleRadius, LocalToGrid(radius));
+        }
+
+        private void ConfigureBox(Vector3 center, Vector3 size, Matrix4x4 rotation)
+        {
             fluidShader.SetVector(kernels.colliders.boxCenter, LocalToGrid(center));
             fluidShader.SetVector(kernels.colliders.boxHalfSize, LocalToGrid(size / 2));
             fluidShader.SetMatrix(kernels.colliders.boxRotation, rotation);
-            fluidShader.SetVector(kernels.forces.forceValue, PackVelocity(force));
-            DispatchForAllGrid(kernels.forces.boxId);
         }
 
         private Vector3 PackVelocity(Vector3 value)
