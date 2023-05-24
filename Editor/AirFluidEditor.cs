@@ -13,8 +13,7 @@ namespace AirFluid
             var blocks = (target as AirFluid).blocks;
             var bSize = AirConstants.blockSize;
             var consumption = (long)blocks.x * blocks.y * blocks.z
-                * 4 * sizeof(float)       // velocity x, y, z + pressure
-                * 2                       // main + temporary matrix
+                * (2 * 4 + 2) * 2       // (velocity x, y, z, w * 2 (main and temp) + div, p) * sizeof(half)
                 * bSize * bSize * bSize;
 
             if (consumption >= 1024 * 1024 * 1024)

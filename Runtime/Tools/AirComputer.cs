@@ -10,6 +10,7 @@ namespace AirFluid
         {
             public int mainTexture;
             public int tempTexture;
+            public int projTexture;
             public FillKernel fill;
             public ProjectionKernel projection;
             public AdvectionKernel advection;
@@ -29,7 +30,6 @@ namespace AirFluid
         {
             public int id;
             public int deltaTime;
-            public int tempToMainId;
         }
 
         struct FillKernel
@@ -77,17 +77,20 @@ namespace AirFluid
 
         public RenderTexture MainTexture { get; }
         public RenderTexture TempTexture { get; }
+        public RenderTexture ProjTexture { get; }
 
         public AirComputer(ComputeShader fluidShader, Vector3Int blocks)
         {
             this.fluidShader = fluidShader;
             this.Blocks = blocks;
 
-            MainTexture = CreateTexture();
-            TempTexture = CreateTexture();
+            MainTexture = CreateTexture(RenderTextureFormat.ARGBHalf);
+            TempTexture = CreateTexture(RenderTextureFormat.ARGBHalf);
+            ProjTexture = CreateTexture(RenderTextureFormat.RGHalf);
 
             kernels.mainTexture = Shader.PropertyToID("MainTexture");
             kernels.tempTexture = Shader.PropertyToID("TempTexture");
+            kernels.projTexture = Shader.PropertyToID("ProjTexture");
             var gridSize = Blocks * AirConstants.blockSize;
             fluidShader.SetInts("GridSize", new int[] { gridSize.x, gridSize.y, gridSize.z });
 
@@ -104,9 +107,7 @@ namespace AirFluid
 
             kernels.advection.id = fluidShader.FindKernel("Advection");
             kernels.advection.deltaTime = Shader.PropertyToID("AdvectionDeltaTime");
-            kernels.advection.tempToMainId = fluidShader.FindKernel("TempToMain");
             InitCommonParameters(kernels.advection.id);
-            InitCommonParameters(kernels.advection.tempToMainId);
 
             kernels.colliders.sphereCenter = Shader.PropertyToID("SphereCenter");
             kernels.colliders.sphereRadius = Shader.PropertyToID("SphereRadius");
@@ -141,6 +142,7 @@ namespace AirFluid
         {
             fluidShader.SetTexture(kernelId, kernels.mainTexture, MainTexture);
             fluidShader.SetTexture(kernelId, kernels.tempTexture, TempTexture);
+            fluidShader.SetTexture(kernelId, kernels.projTexture, ProjTexture);
         }
 
         public void Fill(Vector4 value)
@@ -149,11 +151,13 @@ namespace AirFluid
             DispatchForAllGrid(kernels.fill.id);
         }
 
-        public void Projection(int iterations = 20)
+        public void Projection(int iterations = 10)
         {
             DispatchForAllGrid(kernels.projection.initId);
             for (int i = 0; i < iterations; ++i)
-                DispatchForAllGrid(kernels.projection.iterationId);
+                fluidShader.Dispatch(kernels.projection.iterationId,
+                    Blocks.x, Blocks.y,
+                    Blocks.z * AirConstants.blockSize / 4); // Z_ITERATIONS
             DispatchForAllGrid(kernels.projection.bakeId);
         }
 
@@ -161,7 +165,6 @@ namespace AirFluid
         {
             fluidShader.SetFloat(kernels.advection.deltaTime, dt);
             DispatchForAllGrid(kernels.advection.id);
-            DispatchForAllGrid(kernels.advection.tempToMainId);
         }
 
         public void SphereForce(Vector3 center, float radius, Vector3 force)
@@ -258,10 +261,8 @@ namespace AirFluid
             fluidShader.Dispatch(kernelId, Blocks.x, Blocks.y, Blocks.z * AirConstants.blockSize / 2);
         }
 
-        private RenderTexture CreateTexture()
+        private RenderTexture CreateTexture(RenderTextureFormat format)
         {
-            RenderTextureFormat format = RenderTextureFormat.ARGBFloat;
-
             const int bSize = AirConstants.blockSize;
             RenderTexture t = new RenderTexture(bSize * Blocks.x, bSize * Blocks.y, 0, format);
             t.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;

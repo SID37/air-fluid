@@ -15,6 +15,10 @@ namespace AirFluid
         [Tooltip("Constant velocity at which the flow blows from the outer walls")]
         public Vector3 idleVelocity = new Vector3(0, 0, 0);
 
+        [SerializeField]
+        [Tooltip("Number of iterations of the projection stage")]
+        private int iterations = 10;
+
         [SerializeField, HideInInspector]
         ComputeShader m_Compute = null;
 
@@ -79,7 +83,7 @@ namespace AirFluid
             computer.Advection(dt);
             ApplyWind(dt);
             ApplyObstacles(dt);
-            computer.Projection();
+            computer.Projection(iterations);
         }
 
         private void UpdateCollisions()
@@ -142,7 +146,7 @@ namespace AirFluid
                 windList.Add(new Collisions.Wind<T>()
                 {
                     collider = collider,
-                    force = windSource.WorldForce / Scale
+                    force = Quaternion.Inverse(transform.rotation) * windSource.WorldForce / Scale
                 });
             }
             else
