@@ -70,7 +70,7 @@ void ProjectInit(uint3 id : SV_DispatchThreadID)
     float4 value = TempTexture[id];
 
     float div = MagicValue;
-    if (inSimulationArea(id) && !isMagic(value.w)) {
+    if (inSimulationArea(id)) {
         float4 vx_p = TempTexture[id + uint3(1, 0, 0)];
         float4 vy_p = TempTexture[id + uint3(0, 1, 0)];
         float4 vz_p = TempTexture[id + uint3(0, 0, 1)];
@@ -141,15 +141,15 @@ void ProjectBake(uint3 id : SV_DispatchThreadID)
     float2 vz_n = ProjTexture[id - uint3(0, 0, 1)];
 
     float3 result = value.xyz;
-    if (!isMagic(value.w))
-    {
         float3 grad_p = 0.5 * float3(
             vx_p.y - vx_n.y,
             vy_p.y - vy_n.y,
             vz_p.y - vz_n.y
-        );
-        result -= grad_p / GridSize;
-    }
+        )/ GridSize;
+    if (!isMagic(value.w))
+        result -= grad_p;
+    else
+        result += 3 * grad_p; // TODO: think again
     MainTexture[id] = float4(result, 0);
 }
 

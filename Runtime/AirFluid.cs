@@ -11,9 +11,10 @@ namespace AirFluid
         [Tooltip("Each block is a 16 x 16 x 16 simulation field")]
         public Vector3Int blocks = new Vector3Int(8, 8, 8);
 
-        [SerializeField]
-        [Tooltip("Constant velocity at which the flow blows from the outer walls")]
-        public Vector3 idleVelocity = new Vector3(0, 0, 0);
+        // TODO: implement
+        // [SerializeField]
+        // [Tooltip("Constant velocity at which the flow blows from the outer walls")]
+        private Vector3 idleVelocity = new Vector3(0, 0, 0);
 
         [SerializeField]
         [Tooltip("Number of iterations of the projection stage")]
