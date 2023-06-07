@@ -68,8 +68,9 @@ void Fill(uint3 id : SV_DispatchThreadID)
 void ProjectInit(uint3 id : SV_DispatchThreadID)
 {
     float4 value = TempTexture[id];
+    float2 last = ProjTexture[id];
 
-    float div = MagicValue;
+    float2 result = float2(MagicValue, 0);
     if (inSimulationArea(id)) {
         float4 vx_p = TempTexture[id + uint3(1, 0, 0)];
         float4 vy_p = TempTexture[id + uint3(0, 1, 0)];
@@ -85,14 +86,15 @@ void ProjectInit(uint3 id : SV_DispatchThreadID)
         if (id.x == GridSize.x - 2) vx_p.x = -value.x;
         if (id.y == GridSize.y - 2) vy_p.y = -value.y;
         if (id.z == GridSize.z - 2) vz_p.z = -value.z;
-        div = 0.5 * (
+        float div = 0.5 * (
             + (vx_p.x - vx_n.x) * GridSize.x
             + (vy_p.y - vy_n.y) * GridSize.y
             + (vz_p.z - vz_n.z) * GridSize.z
         );
+        result = float2(div, last.y);
     }
 
-    ProjTexture[id] = float2(div, 0);
+    ProjTexture[id] = result;
 }
 
 #define Z_ITERATIONS 4
@@ -141,11 +143,11 @@ void ProjectBake(uint3 id : SV_DispatchThreadID)
     float2 vz_n = ProjTexture[id - uint3(0, 0, 1)];
 
     float3 result = value.xyz;
-        float3 grad_p = 0.5 * float3(
-            vx_p.y - vx_n.y,
-            vy_p.y - vy_n.y,
-            vz_p.y - vz_n.y
-        )/ GridSize;
+    float3 grad_p = 0.5 * float3(
+        vx_p.y - vx_n.y,
+        vy_p.y - vy_n.y,
+        vz_p.y - vz_n.y
+    )/ GridSize;
     if (!isMagic(value.w))
         result -= grad_p;
     else
@@ -167,12 +169,9 @@ void Advection(uint3 id : SV_DispatchThreadID)
     float4 value = MainTexture[id];
     float3 delta = value.xyz * GridSize * AdvectionDeltaTime;
     float3 p = id - delta;
-    if (p.x < 0) p.x = 0;
-    if (p.y < 0) p.y = 0;
-    if (p.z < 0) p.z = 0;
-    if (p.x >= int(GridSize.x) - 1) p.x = GridSize.x - (1 + 1e-5f);
-    if (p.y >= int(GridSize.y) - 1) p.y = GridSize.y - (1 + 1e-5f);
-    if (p.z >= int(GridSize.z) - 1) p.z = GridSize.z - (1 + 1e-5f);
+    p.x = clamp(p.x, 0, GridSize.x - (1 + 1e-5f));
+    p.y = clamp(p.y, 0, GridSize.y - (1 + 1e-5f));
+    p.z = clamp(p.z, 0, GridSize.z - (1 + 1e-5f));
 
     uint3 int_p = floor(p);
     float3 dp = p - int_p;

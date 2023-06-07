@@ -37,11 +37,10 @@ namespace AirFluid
             UpdateSubProperties();
         }
 
-        // /// ???
-        // void OnValidate()
-        // {
-        //     UpdateSubProperties();
-        // }
+        void OnValidate()
+        {
+            UpdateSubProperties();
+        }
 
         void UpdateSubProperties()
         {
@@ -55,7 +54,8 @@ namespace AirFluid
             return fluids != null
                 && component.HasVector3((int)Position)
                 && component.HasVector3((int)Angles)
-                && component.HasVector3((int)Scale);
+                && component.HasVector3((int)Scale)
+                && component.HasTexture((int)fieldProperty);
         }
 
         public override void UpdateBinding(VisualEffect component)

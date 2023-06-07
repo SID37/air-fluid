@@ -6,9 +6,9 @@ namespace AirFluid
 {
     class AirBoxCollider : AirCollider
     {
-        public Vector3 Size;
-        public Vector3 Center;
-        public Matrix4x4 Rotation;
+        public Vector3 Size { get; }
+        public Vector3 Center { get; }
+        public Matrix4x4 Rotation { get; }
 
         public AirBoxCollider(BoxCollider collider, AirFluid fluids)
         {
