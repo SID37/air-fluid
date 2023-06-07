@@ -50,6 +50,9 @@ namespace AirFluid
             public int boxCenter;
             public int boxHalfSize;
             public int boxRotation;
+            public int meshVertexes;
+            public int meshTriangles;
+            public int meshTriangleCount;
         }
 
         struct ForcesKernel
@@ -65,6 +68,7 @@ namespace AirFluid
             public int sphereId;
             public int capsuleId;
             public int boxId;
+            public int meshId;
             public int velocity;
             public int angularVelocity;
             public int rotationCenter;
@@ -78,6 +82,9 @@ namespace AirFluid
         public RenderTexture MainTexture { get; }
         public RenderTexture TempTexture { get; }
         public RenderTexture ProjTexture { get; }
+
+        ComputeBuffer vertexBuffer;
+        ComputeBuffer trianglesBuffer;
 
         public AirComputer(ComputeShader fluidShader, Vector3Int blocks)
         {
@@ -118,6 +125,9 @@ namespace AirFluid
             kernels.colliders.boxCenter = Shader.PropertyToID("BoxCenter");
             kernels.colliders.boxHalfSize = Shader.PropertyToID("BoxHalfSize");
             kernels.colliders.boxRotation = Shader.PropertyToID("BoxRotation");
+            kernels.colliders.meshVertexes = Shader.PropertyToID("MeshVertexes");
+            kernels.colliders.meshTriangles = Shader.PropertyToID("MeshTriangles");
+            kernels.colliders.meshTriangleCount = Shader.PropertyToID("MeshTriangleCount");
 
             kernels.forces.sphereId = fluidShader.FindKernel("SphereForce");
             kernels.forces.capsuleId = fluidShader.FindKernel("CapsuleForce");
@@ -130,12 +140,14 @@ namespace AirFluid
             kernels.obstacles.sphereId = fluidShader.FindKernel("SphereObstacle");
             kernels.obstacles.capsuleId = fluidShader.FindKernel("CapsuleObstacle");
             kernels.obstacles.boxId = fluidShader.FindKernel("BoxObstacle");
+            kernels.obstacles.meshId = fluidShader.FindKernel("ConvexMeshObstacle");
             kernels.obstacles.velocity = Shader.PropertyToID("ObstacleVelocity");
             kernels.obstacles.angularVelocity = Shader.PropertyToID("ObstacleAngularVelocity");
             kernels.obstacles.rotationCenter = Shader.PropertyToID("ObstacleRotationCenter");
             InitCommonParameters(kernels.obstacles.sphereId);
             InitCommonParameters(kernels.obstacles.capsuleId);
             InitCommonParameters(kernels.obstacles.boxId);
+            InitCommonParameters(kernels.obstacles.meshId);
         }
 
         private void InitCommonParameters(int kernelId)
@@ -209,6 +221,13 @@ namespace AirFluid
             DispatchForAllGrid(kernels.obstacles.boxId);
         }
 
+        public void ConvexMeshObstacle(Matrix4x4 matrix, Mesh mesh, Vector3 center, Vector3 velocity, Vector3 angularVelocity)
+        {
+            ConfigureMesh(kernels.obstacles.meshId, matrix, mesh);
+            ConfigureObstacle(velocity, angularVelocity, center);
+            DispatchForAllGrid(kernels.obstacles.meshId);
+        }
+
         private void ConfigureObstacle(Vector3 velocity, Vector3 angularVelocity, Vector3 center)
         {
             fluidShader.SetVector(kernels.obstacles.velocity, PackVelocity(velocity));
@@ -241,9 +260,44 @@ namespace AirFluid
             fluidShader.SetMatrix(kernels.colliders.boxRotation, rotation);
         }
 
+        private void ConfigureMesh(int kernel, Matrix4x4 matrix, Mesh mesh)
+        {
+            Vector3[] vertexes = new Vector3[mesh.vertices.Length];
+            for (int i = 0; i < vertexes.Length; ++i)
+            {
+                var v = mesh.vertices[i];
+                vertexes[i] = LocalToGrid(matrix * new Vector4(v.x, v.y, v.z, 1));
+            }
+
+            if (vertexBuffer == null || vertexBuffer.count < vertexes.Length)
+            {
+                vertexBuffer?.Release();
+                vertexBuffer = new ComputeBuffer(vertexes.Length, sizeof(float) * 3);
+            }
+
+            if (trianglesBuffer == null || trianglesBuffer.count < mesh.triangles.Length)
+            {
+                trianglesBuffer?.Release();
+                trianglesBuffer = new ComputeBuffer(mesh.triangles.Length, sizeof(int));
+            }
+
+            vertexBuffer.SetData(vertexes);
+            trianglesBuffer.SetData(mesh.triangles);
+
+            fluidShader.SetBuffer(kernel, kernels.colliders.meshVertexes, vertexBuffer);
+            fluidShader.SetBuffer(kernel, kernels.colliders.meshTriangles, trianglesBuffer);
+            fluidShader.SetInt(kernels.colliders.meshTriangleCount, mesh.triangles.Length / 3);
+        }
+
         private Vector3 PackVelocity(Vector3 value)
         {
             return new Vector3(value.x / Blocks.x, value.y / Blocks.y, value.z / Blocks.z);
+        }
+
+        private Matrix4x4 LocalToGrid(Matrix4x4 transform)
+        {
+            var b = AirConstants.blockSize;
+            return Matrix4x4.Scale(new Vector3(b, b, b)) * transform;
         }
 
         private Vector3 LocalToGrid(Vector3 position)
@@ -272,10 +326,40 @@ namespace AirFluid
             return t;
         }
 
+        // private ComputeBuffer CreateBuffer(int size, int stride)
+        // {
+        //     ComputeBuffer buffer = new ComputeBuffer(size, stride);
+
+        //     Texture2D texture = new Texture2D(size, 0, format, -1, false);
+        //     texture.SetPixels();
+        //     // const int bSize = AirConstants.blockSize;
+        //     // RenderTexture t = new RenderTexture(bSize * Blocks.x, bSize * Blocks.y, 0, format);
+        //     // t.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+        //     // t.volumeDepth = bSize * Blocks.z;
+        //     // t.enableRandomWrite = true;
+        //     // t.Create();
+        //     // return t;
+
+        //         ShaderCube[] cube_arr = cube_data.ToArray();
+        //         ShaderCube[] output_arr = cube_data.ToArray();
+        //         ComputeBuffer cubeBuffer = new ComputeBuffer(x_cubes*y_cubes*z_cubes,sizeof(float)*36);
+        //         int kernel = shader.FindKernel("CSMain");
+
+        //         cubeBuffer.SetData(cube_arr);
+        //         shader.SetFloat("isoLevel",isoLevel);
+        //         shader.SetBuffer(kernel, "_Cubes", cubeBuffer);
+
+        //         shader.Dispatch(kernel, 16, 1, 1);
+        //         cubeBuffer.GetData(output_arr);
+        //         cubeBuffer.Release();
+        // }
+
         public void Release()
         {
             MainTexture.Release();
             TempTexture.Release();
+            vertexBuffer?.Release();
+            trianglesBuffer?.Release();
         }
     }
 }

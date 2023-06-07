@@ -13,6 +13,7 @@
 #pragma kernel SphereObstacle
 #pragma kernel CapsuleObstacle
 #pragma kernel BoxObstacle
+#pragma kernel ConvexMeshObstacle
 
 
 const static float MagicValue = -73;
@@ -227,6 +228,24 @@ bool collideBox(uint3 id)
     return d.x < BoxHalfSize.x && d.y < BoxHalfSize.y && d.z < BoxHalfSize.z;
 }
 
+Buffer<float3> MeshVertexes;
+Buffer<int> MeshTriangles;
+int MeshTriangleCount;
+
+bool collideConvexMesh(uint3 id)
+{
+    for (int i = 0; i < MeshTriangleCount; ++i) {
+        float3 p1 = MeshVertexes[MeshTriangles[i * 3 + 0]];
+        float3 p2 = MeshVertexes[MeshTriangles[i * 3 + 1]];
+        float3 p3 = MeshVertexes[MeshTriangles[i * 3 + 2]];
+
+        float3x3 m = float3x3(id - p1, p2 - p1, p3 - p1);
+        float s = determinant(m);
+        if (s > 0)
+            return false;
+    }
+    return true;
+}
 
 // ##########################
 // #          Force         #
@@ -301,5 +320,13 @@ void BoxObstacle(uint3 id : SV_DispatchThreadID)
 {
     if (!inSimulationArea(id)) return;
     if (!collideBox(id)) return;
+    applyObstacle(id);
+}
+
+[numthreads(16, 16, 2)]
+void ConvexMeshObstacle(uint3 id : SV_DispatchThreadID)
+{
+    if (!inSimulationArea(id)) return;
+    if (!collideConvexMesh(id)) return;
     applyObstacle(id);
 }

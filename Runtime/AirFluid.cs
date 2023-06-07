@@ -41,19 +41,23 @@ namespace AirFluid
             public List<Wind<AirSphereCollider>> SphereWinds = new();
             public List<Wind<AirCapsuleCollider>> CapsuleWinds = new();
             public List<Wind<AirBoxCollider>> BoxWinds = new();
+            public List<Wind<AirMeshCollider>> MeshWinds = new();
 
             public List<Obstacle<AirSphereCollider>> SphereObstacles = new();
             public List<Obstacle<AirCapsuleCollider>> CapsuleObstacles = new();
             public List<Obstacle<AirBoxCollider>> BoxObstacles = new();
+            public List<Obstacle<AirMeshCollider>> MeshObstacles = new();
 
             public void Clear()
             {
                 SphereWinds.Clear();
                 CapsuleWinds.Clear();
                 BoxWinds.Clear();
+                MeshWinds.Clear();
                 SphereObstacles.Clear();
                 CapsuleObstacles.Clear();
                 BoxObstacles.Clear();
+                MeshObstacles.Clear();
             }
         }
 
@@ -131,7 +135,7 @@ namespace AirFluid
                     case SphereCollider sCollider: StoreCollision(new AirSphereCollider(sCollider, this), windSource, rigidbody, collisions.SphereWinds, collisions.SphereObstacles); break;
                     case CapsuleCollider cCollider: StoreCollision(new AirCapsuleCollider(cCollider, this), windSource, rigidbody, collisions.CapsuleWinds, collisions.CapsuleObstacles); break;
                     case BoxCollider bCollider: StoreCollision(new AirBoxCollider(bCollider, this), windSource, rigidbody, collisions.BoxWinds, collisions.BoxObstacles); break;
-                    case MeshCollider mCollider: Debug.Log($"MeshCollider {mCollider.sharedMesh}"); break;
+                    case MeshCollider mCollider: StoreCollision(new AirMeshCollider(mCollider, this), windSource, rigidbody, collisions.MeshWinds, collisions.MeshObstacles); break;
                     case TerrainCollider tCollider: Debug.Log($"TerrainCollider {tCollider.terrainData}"); break;
                     case WheelCollider wCollider: Debug.Log($"WheelCollider {wCollider.center}"); break;
                     default: Debug.LogWarning($"Unsupported collider: {collider.GetType()}"); break;
@@ -170,6 +174,8 @@ namespace AirFluid
                 computer.CapsuleForce(w.collider.Point1, w.collider.Point2, w.collider.Radius, w.force * dt);
             foreach (var w in collisions.BoxWinds)
                 computer.BoxForce(w.collider.Center, w.collider.Size, w.collider.Rotation, w.force * dt);
+            // foreach (var w in collisions.MeshWinds)
+            //     computer.BoxForce(w.collider.Center, w.collider.Size, w.collider.Rotation, w.force * dt);
         }
 
         private void ApplyObstacles(float dt)
@@ -180,6 +186,14 @@ namespace AirFluid
                 computer.CapsuleObstacle(o.collider.Point1, o.collider.Point2, o.collider.Radius, o.velocity, o.angularVelocity);
             foreach (var o in collisions.BoxObstacles)
                 computer.BoxObstacle(o.collider.Center, o.collider.Size, o.collider.Rotation, o.velocity, o.angularVelocity);
+            foreach (var o in collisions.MeshObstacles) {
+                if (!o.collider.Convex)
+                {
+                    Debug.Log("Unsupported non-convex collider");
+                    continue;
+                }
+                computer.ConvexMeshObstacle(o.collider.Matrix, o.collider.MeshData, o.collider.Center, o.velocity, o.angularVelocity);
+            }
         }
 
         internal Vector3 LocalToWorld(Vector3 point)
